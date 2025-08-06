@@ -23,10 +23,20 @@ int AI_Ultrasonido = A0; //Pin de entrada analogica para el sensor de ultrasonid
 void setup() {
     // Initialize serial communication at 9600 baud rate
     Serial.begin(9600);
-    pinMode(Sensor_Etiqueta, INPUT); //Pin de entrada digital correspondiente a la señal del sensor de etiqueta
-    pinMode(SD_Cinta, OUTPUT); //Pin de salida digital para activar la cinta transportadora
-    pinMode(ED_Stop, INPUT); //Pin de entrada digital para detener la cinta transportadora proveniente de un boton de stop
-    //Recordar que el boton de stop es NC (Normalmente Cerrado)
+    // Configurar pines de entrada y salida
+    pinMode(ED_Start, INPUT);
+    pinMode(ED_Stop, INPUT); 
+    pinMode(ED_Emergencia, INPUT); 
+    pinMode(ED_reset_contador, INPUT); 
+    pinMode(SD_Led_Start, OUTPUT);
+    pinMode(SD_Led_Stop, OUTPUT);
+    pinMode(SD_Led_Emergencia, OUTPUT);
+    pinMode(SD_Led_Reset, OUTPUT);
+    pinMode(SD_Cinta, OUTPUT);
+    pinMode(SD_Etiquetadora, OUTPUT);   
+    pinMode(ED_FinalCarrera_Cinta, INPUT);
+    pinMode(ED_Sensor_De_Etiqueta, INPUT);
+    pinMode(AI_Ultrasonido, INPUT);
 }
 
 void loop() {
