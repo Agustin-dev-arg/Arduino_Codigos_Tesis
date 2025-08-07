@@ -8,7 +8,7 @@ int ED_Stop = 3; //Pin de entrada digital para detener el proceso
 int ED_reset_contador = 5; //Pin de entrada digital para resetear contador de botellas que fueron etiquetadas
 int SD_Led_Start = 6; //Pin de salida digital para activar un led que indica que el proceso ha iniciado
 int SD_Led_Stop = 7; //Pin de salida digital para activar un led que indica que el proceso ha detenido
-int SD_Led_Reset = 9; //Pin de salida digital para activar un led que indica que el contador debe ser reseteado
+int SD_Led_Reset = 8; //Pin de salida digital para activar un led que indica que el contador debe ser reseteado
 int SD_Cinta = 10; //Pin de salida digital para activar el rele del pwm que acciona la cinta transportadora
 int SD_Etiquetadora = 11; //Pin de salida digital para activar el rele del pwm que acciona el motor de la etiquetadora
 int ED_FinalCarrera_Cinta = 12; //si esta presionado quiere decir que una botella ha llegado al final de la cinta transportadora
@@ -35,22 +35,26 @@ void setup() {
     pinMode(ED_Sensor_De_Etiqueta, INPUT);
     pinMode(AI_Ultrasonido, INPUT);
     Lectura_Valor_De_Entradas();
+    
 }
 
 void loop() {
     //Tener en cuenta que STOP arranca en 0 por defecto. Quiere decir que el proceso se ejecuta con normalidad
 
-    if(constante_ValorPin_ED_Stop == LOW) {
+    if(constante_ValorPin_ED_Stop == LOW && digitalRead(ED_Stop) == LOW){
         // Iniciar el proceso
+        delay(2000); // Esperar .1 segundo antes de iniciar el proceso
         Serial.println("Proceso Iniciado");
+        Lectura_Valor_De_Entradas();
+        Funcion_Start();
     }else{
         // Detener el proceso
 
-        if(digitalRead(ED_Stop) == LOW){ //Si el pin ED_Stop es LOW quiere decir que el boton de paro no esta presionado
+        if(digitalRead(ED_Stop) == LOW && digitalRead(ED_Start) == HIGH){ //Si el pin ED_Stop es LOW quiere decir que el boton de paro no esta presionado
             //reanudar el proceso
             constante_ValorPin_ED_Stop = LOW; 
             Serial.println("Proceso Reanudado");
-            Funcion_Leds_Start(); //Encender el led de inicio
+            Funcion_Start(); //Encender el led de inicio
             //Probar 2 opciones: a) Dejar los contadores con el valor que tenian antes de detenerse
             //b) Resetear los contadores a 0
         }else{
@@ -92,8 +96,9 @@ void Funcion_Stop(){
 }
 
 //Funcion_Leds_Start
-void Funcion_Leds_Start(){
+void Funcion_Start(){
     digitalWrite(SD_Led_Start, HIGH);
     digitalWrite(SD_Led_Reset, LOW);
     digitalWrite(SD_Led_Stop, LOW);
+    digitalWrite(SD_Cinta, HIGH);
 }
