@@ -1,21 +1,33 @@
 #include <Arduino.h>
-//Definicion de pines y variables
-int Sensor_Etiqueta = 8;
-//ED = Entrada Digital ; SD = Salida Digital
+//Definicion de pines
 
+//ED = Entrada Digital ; SD = Salida Digital
 int ED_Start = 2; //Pin de entrada digital para reanudar el proceso cuando es detenido
 int ED_Stop = 3; //Pin de entrada digital para detener el proceso
-int ED_reset_contador = 5; //Pin de entrada digital para resetear contador de botellas que fueron etiquetadas
+int SD_Rele_Cinta = 4; //Pin de salida digital para activar el rele del pwm que acciona la cinta transportadora
+int SD_Rele_Etiquetadora = 5; //Pin de salida digital para activar el rele del pwm que acciona el motor de la etiquetadora
 int SD_Led_Start = 6; //Pin de salida digital para activar un led que indica que el proceso ha iniciado
 int SD_Led_Stop = 7; //Pin de salida digital para activar un led que indica que el proceso ha detenido
-int SD_Led_Reset = 8; //Pin de salida digital para activar un led que indica que el contador debe ser reseteado
-int SD_Cinta = 10; //Pin de salida digital para activar el rele del pwm que acciona la cinta transportadora
-int SD_Etiquetadora = 11; //Pin de salida digital para activar el rele del pwm que acciona el motor de la etiquetadora
-int ED_FinalCarrera_Cinta = 12; //si esta presionado quiere decir que una botella ha llegado al final de la cinta transportadora
-// para la simulacion se usara un switch.
-int ED_Sensor_De_Etiqueta= 13; //Pin de entrada digital que detecta el gap de etiqueta.
-int AI_Ultrasonido = A0; //Pin de entrada analogica para el sensor de ultrasonido reemplazado por un final de carrera que tomara una señal DIGITAL
-//para simular el conteo de botellas.
+//pines de LED van directamente a mostrarse por interfaz web. Por ahora los dejamos hasta configurar la interfaz
+int ED_Sensor_De_Etiqueta= 8; //Pin de entrada digital que detecta el gap de etiqueta.
+
+//Error el ultrasonido utiliza 2 pines digitales, uno para trigger y otro para echo.
+//Quedarian 6 pines digitales libres que corresponden a 3 sensores de ultrasonido. 
+//Para la simulación se usara S1 con sensor ultrasonido, S2 y S3 seran pulsadores.
+//Donde SU1 = Sensor Ultrasonido 1 encargado de detectar presencia de la botella y sera utilizado para permitir el despegue de la primer etiqueta, SU2 = Sensor Ultrasonido 2, 
+//SU3 = Sensor Ultrasonido 3 utilizado para determinar cuando la botella fue etiquetada y además evitar la acumulacion de botellas en la cinta transportadora.
+
+int SensorUS_S1 = 9; //Pin de entrada digital para el boton que representa S1
+int SensorUS_S2 = 10; //Pin de entrada digital para el boton que representa S2
+int SensorUS_S3 = 11; //Pin de entrada digital para el boton que representa S3
+
+
+//Protocolo de comunicacion HTTP y Asincronico
+//Se deberá coordinar esp32 con django y django con el frotend actuando django de intermediario.
+//1. Se hará una prueba, creando un programa  en el que se determine si la esp32 esta conectada o no.
+//2. Se creara un programa que permita enviar datos desde la esp32 a django y viceversa.
+
+
 
 //Definicion de variables
 int constante_ValorPin_ED_Stop = 0; //Constante para almacenar el valor del pin ED_Stop
@@ -25,15 +37,14 @@ void setup() {
     // Configurar pines de entrada y salida
     pinMode(ED_Start, INPUT);
     pinMode(ED_Stop, INPUT); 
-    pinMode(ED_reset_contador, INPUT); 
     pinMode(SD_Led_Start, OUTPUT);
     pinMode(SD_Led_Stop, OUTPUT);
-    pinMode(SD_Led_Reset, OUTPUT);
-    pinMode(SD_Cinta, OUTPUT);
-    pinMode(SD_Etiquetadora, OUTPUT);   
-    pinMode(ED_FinalCarrera_Cinta, INPUT);
+    pinMode(SD_Rele_Cinta, OUTPUT);
+    pinMode(SD_Rele_Etiquetadora, OUTPUT);
     pinMode(ED_Sensor_De_Etiqueta, INPUT);
-    pinMode(AI_Ultrasonido, INPUT);
+    pinMode(SensorUS_S1, INPUT);
+    pinMode(SensorUS_S2, INPUT);
+    pinMode(SensorUS_S3, INPUT);
     Lectura_Valor_De_Entradas();
     
 }
@@ -55,8 +66,15 @@ void loop() {
             constante_ValorPin_ED_Stop = LOW; 
             Serial.println("Proceso Reanudado");
             Funcion_Start(); //Encender el led de inicio
-            //Probar 2 opciones: a) Dejar los contadores con el valor que tenian antes de detenerse
-            //b) Resetear los contadores a 0
+            digitalWrite(SD_Rele_Cinta, HIGH); //Encender la cinta transportadora
+
+            if(SensorUS_S1 == HIGH){
+                // Si S1 está activo, permitir el despegue de la etiqueta
+                //encendemos el motor de la etiquetadora HASTA que detecta el GAP de la etiqueta
+                while(ED_Sensor_De_Etiqueta == HIGH) { //mientras sea HIGH quiere decir que esta detectando la etiqueta.
+                    digitalWrite(SD_Rele_Etiquetadora, HIGH); //Encender el motor de la etiquetadora
+                }
+            }
         }else{
             //Si el pin ED_Stop es HIGH quiere decir que el boton de paro esta presionado
             //Detener el proceso
@@ -70,27 +88,23 @@ void loop() {
 //y mostrarlo por el puerto serie
 void Lectura_Valor_De_Entradas(){
     Serial.println("Estado Inicial de las Entradas:");
+    //Las lecturas de ED_Start y ED_Stop van a trabajar en conjunto a la interfaz web, permitiando al usuario
+    //iniciar o terminar el proceso de manera fisica o por software.
     Serial.print("ED_Start: ");
     Serial.println(digitalRead(ED_Start));
     Serial.print("ED_Stop: ");
     Serial.println(digitalRead(ED_Stop));
-    Serial.print("ED_reset_contador: ");
-    Serial.println(digitalRead(ED_reset_contador));
-    Serial.print("ED_FinalCarrera_Cinta: ");
-    Serial.println(digitalRead(ED_FinalCarrera_Cinta));
     Serial.print("ED_Sensor_De_Etiqueta: ");
     Serial.println(digitalRead(ED_Sensor_De_Etiqueta));
-    Serial.print("AI_Ultrasonido: ");
-    Serial.println(analogRead(AI_Ultrasonido));
 }
     
 //Funcion_Leds_Stop de funcionamiento y encender los leds de stop:
 void Funcion_Stop(){
+    //Los leds start y stop se deberian ver reflejados en la interfaz web
     digitalWrite(SD_Led_Start, LOW);
-    digitalWrite(SD_Led_Reset, LOW);
     digitalWrite(SD_Led_Stop, HIGH);
-    digitalWrite(SD_Cinta, LOW);
-    digitalWrite(SD_Etiquetadora, LOW);
+    digitalWrite(SD_Rele_Cinta, LOW);
+    digitalWrite(SD_Rele_Etiquetadora, LOW);
     constante_ValorPin_ED_Stop = HIGH; //Actualizar el valor del pin ED_Stop a HIGH para indicar que el proceso esta detenido
     Serial.println("Proceso Detenido");
 }
@@ -98,7 +112,6 @@ void Funcion_Stop(){
 //Funcion_Leds_Start
 void Funcion_Start(){
     digitalWrite(SD_Led_Start, HIGH);
-    digitalWrite(SD_Led_Reset, LOW);
     digitalWrite(SD_Led_Stop, LOW);
-    digitalWrite(SD_Cinta, HIGH);
+
 }
