@@ -35,18 +35,25 @@ void setup() {
     // Initialize serial communication at 9600 baud rate
     Serial.begin(9600);
     // Configurar pines de entrada y salida
-    pinMode(ED_Start, INPUT);
-    pinMode(ED_Stop, INPUT); 
+    pinMode(ED_Start, INPUT_PULLDOWN);
+    pinMode(ED_Stop, INPUT_PULLDOWN); 
     pinMode(SD_Led_Start, OUTPUT);
     pinMode(SD_Led_Stop, OUTPUT);
     pinMode(SD_Rele_Cinta, OUTPUT);
     pinMode(SD_Rele_Etiquetadora, OUTPUT);
-    pinMode(ED_Sensor_De_Etiqueta, INPUT);
-    pinMode(SensorUS_S1, INPUT);
-    pinMode(SensorUS_S2, INPUT);
-    pinMode(SensorUS_S3, INPUT);
+    pinMode(ED_Sensor_De_Etiqueta, INPUT_PULLUP);
+    pinMode(SensorUS_S1, INPUT_PULLDOWN);
+    pinMode(SensorUS_S2, INPUT_PULLDOWN);
+    pinMode(SensorUS_S3, INPUT_PULLDOWN);
     Lectura_Valor_De_Entradas();
-    
+
+    while(digitalRead(ED_Sensor_De_Etiqueta) != 0){
+        Serial.println("Buscando gap de etiqueta...");
+        //El sensor de etiqueta no detecto el gap, por ende tiene que buscarlo.
+        //Se debera prender el motor de cinta hasta que encuentre el gap
+        digitalWrite(SD_Rele_Etiquetadora, HIGH);
+    }
+    digitalWrite(SD_Rele_Cinta, HIGH);
 }
 
 void loop() {
@@ -54,10 +61,12 @@ void loop() {
 
     if(constante_ValorPin_ED_Stop == LOW && digitalRead(ED_Stop) == LOW){
         // Iniciar el proceso
-        delay(2000); // Esperar .1 segundo antes de iniciar el proceso
-        Serial.println("Proceso Iniciado");
-        Lectura_Valor_De_Entradas();
+        Serial.println("IF principal");
+        //Lectura_Valor_De_Entradas();
+
         Funcion_Start();
+        Encender_Rele_Etiquetadora();
+        
     }else{
         // Detener el proceso
 
@@ -67,20 +76,26 @@ void loop() {
             Serial.println("Proceso Reanudado");
             Funcion_Start(); //Encender el led de inicio
             digitalWrite(SD_Rele_Cinta, HIGH); //Encender la cinta transportadora
-
-            if(SensorUS_S1 == HIGH){
-                // Si S1 está activo, permitir el despegue de la etiqueta
-                //encendemos el motor de la etiquetadora HASTA que detecta el GAP de la etiqueta
-                while(ED_Sensor_De_Etiqueta == HIGH) { //mientras sea HIGH quiere decir que esta detectando la etiqueta.
-                    digitalWrite(SD_Rele_Etiquetadora, HIGH); //Encender el motor de la etiquetadora
-                }
-            }
         }else{
             //Si el pin ED_Stop es HIGH quiere decir que el boton de paro esta presionado
             //Detener el proceso
             Funcion_Stop();
         }
 
+    }
+    //delay(2000);
+}
+
+
+void Encender_Rele_Etiquetadora(){
+    if(digitalRead(SensorUS_S1) == HIGH && digitalRead(ED_Sensor_De_Etiqueta) == HIGH){
+        // Si S1 está activo, permitir el despegue de la etiqueta
+        //encendemos el motor de la etiquetadora HASTA que detecta el GAP de la etiqueta
+        //Serial.println("Entre a SensorUS_S1");
+        digitalWrite(SD_Rele_Etiquetadora, HIGH); //Encender el motor de la etiquetadora
+    }else{
+        digitalWrite(SD_Rele_Etiquetadora, LOW); //Apagar el motor de la etiquetadora
+        //Serial.println("Salí de SensorUS_S1");
     }
 }
 
@@ -96,6 +111,8 @@ void Lectura_Valor_De_Entradas(){
     Serial.println(digitalRead(ED_Stop));
     Serial.print("ED_Sensor_De_Etiqueta: ");
     Serial.println(digitalRead(ED_Sensor_De_Etiqueta));
+    Serial.print("SensorUS_S1: ");
+    Serial.println(digitalRead(SensorUS_S1));
 }
     
 //Funcion_Leds_Stop de funcionamiento y encender los leds de stop:
